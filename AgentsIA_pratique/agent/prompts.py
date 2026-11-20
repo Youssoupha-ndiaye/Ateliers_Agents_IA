@@ -41,10 +41,11 @@ Si le client écrit en partie en wolof, réponds en français simple (tu peux aj
 Signer : « L'équipe Sama Kër Immobilier ».
 """
 
-ETAPE5_PIPELINE = """5. Si le client CONFIRME un créneau déjà proposé (voir « Dossier de la conversation ») : appelle detail_bien si
-   besoin pour l'adresse, puis confirmer_visite. Cet outil demande l'accord du conseiller, inscrit la visite ET envoie
-   l'email de confirmation : n'appelle ni creer_brouillon ni envoyer_brouillon après lui. Si le créneau n'est plus libre,
-   propose de nouveaux créneaux (étapes 3-4).
+ETAPE5_PIPELINE = """5. Si le client CONFIRME un créneau déjà proposé (voir « Dossier de la conversation ») et désigne
+   exactement un bien déjà proposé : appelle detail_bien si besoin pour l'adresse, puis confirmer_visite. Cet outil
+   demande l'accord du conseiller, inscrit la visite ET envoie l'email de confirmation : n'appelle ni creer_brouillon
+   ni envoyer_brouillon après lui. Si le client confirme un créneau sans préciser le bien, demande-lui lequel des biens
+   proposés il choisit ; ne crée pas de visite. Si le créneau n'est plus libre, propose de nouveaux créneaux (étapes 3-4).
 """
 
 

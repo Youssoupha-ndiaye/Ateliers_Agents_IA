@@ -1,0 +1,128 @@
+{
+  "1a1f95b179d00f4b": {
+    "client": "youssoupha mbaye ndiaye <ndiayeyoussoupha264@gmail.com>",
+    "historique": [
+      {
+        "date": "2026-11-20 14:31",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 14:35",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 14:44",
+        "decision": "repondu",
+        "validations": 1
+      },
+      {
+        "date": "2026-11-20 15:01",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 15:04",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 15:09",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:12",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:14",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:22",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:25",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:29",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:32",
+        "decision": "aucune_action",
+        "validations": 0
+      },
+      {
+        "date": "2026-11-20 16:36",
+        "decision": "repondu",
+        "validations": 1
+      },
+      {
+        "date": "2026-11-20 16:44",
+        "decision": "repondu",
+        "validations": 1
+      }
+    ],
+    "biens_proposes": [],
+    "creneaux_proposes": [
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T16:00:00+00:00",
+        "fin": "2026-11-26T16:45:00+00:00"
+      },
+      {
+        "conseiller": "Moussa",
+        "debut": "2026-11-26T16:30:00+00:00",
+        "fin": "2026-11-26T17:15:00+00:00"
+      },
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T17:00:00+00:00",
+        "fin": "2026-11-26T17:45:00+00:00"
+      }
+    ]
+  },
+  "1a1f9b847c26c523": {
+    "client": "YoussouphaMbaye NDIAYE <ndiaye.youssoupha-mbaye@ugb.edu.sn>",
+    "historique": [
+      {
+        "date": "2026-11-20 16:18",
+        "decision": "repondu",
+        "validations": 1
+      },
+      {
+        "date": "2026-11-20 16:40",
+        "decision": "repondu",
+        "validations": 1
+      }
+    ],
+    "biens_proposes": [],
+    "creneaux_proposes": [
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T14:00:00+00:00",
+        "fin": "2026-11-26T14:45:00+00:00"
+      },
+      {
+        "conseiller": "Moussa",
+        "debut": "2026-11-26T14:30:00+00:00",
+        "fin": "2026-11-26T15:15:00+00:00"
+      },
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T15:00:00+00:00",
+        "fin": "2026-11-26T15:45:00+00:00"
+      }
+    ]
+  }
+}

@@ -1,0 +1,31 @@
+flowchart LR
+  G[(Gmail<br/>compte de test)] -->|messages entrants<br/>releve toutes les 60 s| P[agent/pipeline.py]
+  P --> GF{garde_fous.py<br/>injection ou hors perimetre ?}
+  GF -->|oui : sans LLM| H[Libelle « Transmis a un conseiller »]
+  GF -->|non| A[Agent LangGraph ReAct<br/>Ollama qwen2.5:7b]
+
+  A <-->|rechercher_biens<br/>detail_bien| M[Serveur MCP<br/>stdio ou HTTP]
+  M --- DB[(SQLite<br/>catalogue des biens)]
+  A -->|lister_creneaux_libres| C[(Google Calendar<br/>agendas des conseillers)]
+
+  A -->|reponse redigee| D{Brouillon cree ?}
+  D -->|non : oubli du modele| F[Fallback de pipeline<br/>cree le brouillon]
+  D -->|oui| GT[agent/gmail_tools.py]
+  F --> GT
+  GT -->|creer_brouillon<br/>aucun envoi a ce stade| G
+  GT -->|envoyer_brouillon demande l'accord| V1{{Validation 1<br/>relire la reponse}}
+
+  V1 -->|validation.demander| UI[ui_gradio.py<br/>affiche message recu + reponse proposee]
+  UI -->|Refuser : rien n'est envoye| R[Brouillon conserve dans Gmail]
+  UI -->|Valider| G
+
+  G -->|reponse du client dans le meme fil| P
+  P -->|contexte et propositions conserves| A
+  A -->|confirmer_visite| V2{{Validation 2<br/>visite et email de confirmation}}
+  V2 -->|validation.demander| UI
+  UI -->|Refuser : pas de visite ni de confirmation| R2[Visite non inscrite]
+  UI -->|Valider| C
+  UI -->|Valider| G
+
+  P -.-> T[(traces/*.jsonl)]
+  P -.-> S[(state/conversations.json)]

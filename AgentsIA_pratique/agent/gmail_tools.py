@@ -54,13 +54,16 @@ class GmailBackend:
             self.ids[etat] = existants[nom]
 
     def non_traites(self, max_n=10):
-        """Messages reçus (pas envoyés par l'agence) qui n'ont encore aucun libellé d'état final.
-        Une réponse du client dans un fil déjà « Répondu » est un nouveau message sans libellé : elle est reprise."""
+        """Renvoie le dernier message entrant non final de chaque fil, du plus ancien au plus récent."""
         msgs = self.svc.messages().list(userId="me", q="in:inbox -from:me", maxResults=max_n).execute().get("messages", [])
         finaux = {self.ids["attente_validation"], self.ids["repondu"], self.ids["transmis"]}
-        res = []
-        for m in reversed(msgs):  # du plus ancien au plus récent
+        derniers = {}
+        for m in msgs:  # Gmail renvoie les messages du plus récent au plus ancien.
             meta = self.svc.messages().get(userId="me", id=m["id"], format="minimal").execute()
+            thread_id = meta.get("threadId", m.get("threadId", m["id"]))
+            derniers.setdefault(thread_id, (m, meta))
+        res = []
+        for m, meta in reversed(list(derniers.values())):
             if not finaux & set(meta.get("labelIds", [])):
                 res.append(self.message(m["id"]))
         return res
@@ -185,8 +188,11 @@ class BoiteAgence:
         try:
             d = self.b.lire_brouillon(draft_id)
             self._fil_autorise(d["thread_id"])
-            ok, motif = demander("Envoyer l'email", {"a": d.get("a") or self.ctx.get("de"), "sujet": d.get("sujet"),
-                                                     "draft_id": draft_id, "corps": d["corps"]})
+            details = {"a": d.get("a") or self.ctx.get("de"), "sujet": d.get("sujet"),
+                       "draft_id": draft_id, "corps": d["corps"]}
+            if self.ctx.get("message_recu"):
+                details["message_recu"] = self.ctx["message_recu"]
+            ok, motif = demander("Envoyer l'email", details)
             if not ok:
                 self.ctx["refus"] = motif
                 return {"ok": False, "erreur": f"REFUS_CONSEILLER : {motif}. Rien n'a été envoyé ; le brouillon reste en attente."}
