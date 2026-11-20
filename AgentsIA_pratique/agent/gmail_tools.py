@@ -13,6 +13,7 @@ La logique (classe BoiteAgence) est testable sans LangChain (tests/test_ex4_gmai
 """
 import base64
 import itertools
+import re
 from email.mime.text import MIMEText
 
 from pydantic import BaseModel, Field
@@ -169,6 +170,7 @@ class BoiteAgence:
             thread_id = self.ctx.get("thread_id") or thread_id  # le fil est imposé par le pipeline
             if self.ctx.get("cloture"):
                 return {"ok": False, "erreur": "CONVERSATION_CLOSE : la confirmation a déjà été envoyée. N'écris rien d'autre."}
+            corps = re.sub(r"\bJerais\s+vous\s+inviter\b", "Je vous invite", corps, flags=re.IGNORECASE)
             if len(corps.strip()) < 20:
                 return {"ok": False, "erreur": "Corps trop court : rédige la réponse complète au client."}
             did = self.b.brouillon(thread_id, self.ctx.get("de", ""), self.ctx.get("sujet", "Votre demande de visite"),
