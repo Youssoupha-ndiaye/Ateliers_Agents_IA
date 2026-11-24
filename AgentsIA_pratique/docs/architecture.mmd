@@ -1,5 +1,5 @@
 flowchart LR
-  G[(Gmail<br/>compte de test)] -->|messages entrants<br/>releve toutes les 60 s| P[agent/pipeline.py]
+  G[(Gmail<br/>compte de test)] -->|messages entrants<br/>releve toutes les 30 s| P[agent/pipeline.py]
   P --> GF{garde_fous.py<br/>injection ou hors perimetre ?}
   GF -->|oui : sans LLM| H[Libelle « Transmis a un conseiller »]
   GF -->|non| A[Agent LangGraph ReAct<br/>Ollama qwen2.5:7b]

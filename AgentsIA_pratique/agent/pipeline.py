@@ -13,7 +13,7 @@ visites créées, décisions. Le fil Gmail reste la source de vérité ; le doss
 
 Usage :
   python agent/pipeline.py --once     # traite les emails en attente puis s'arrête
-  python agent/pipeline.py            # tourne en continu (relève toutes les 60 s) — mode démo devant le jury
+  python agent/pipeline.py            # tourne en continu (relève toutes les 30 s, RELEVE_SECONDES dans .env) — mode démo devant le jury
   python agent/pipeline.py --demo     # répétition hors ligne : Gmail/Agenda simulés, réponse du client simulée
 """
 import argparse
@@ -375,7 +375,7 @@ async def boucle(once: bool):
     gmail = gmail_tools.GmailBackend()
     cal = calendar_tools.GoogleCalendarBackend(config.conseillers())
     outils_mcp = await outils_catalogue_mcp()
-    print(f"Pipeline Sama Kër démarré ({config.OLLAMA_MODEL}). Relève Gmail {'une fois' if once else 'toutes les 60 s'}.")
+    print(f"Pipeline Sama Kër démarré ({config.OLLAMA_MODEL}). Relève Gmail {'une fois' if once else f'toutes les {config.RELEVE_SECONDES} s'}.")
     while True:
         etat = charger_etat()
         for msg in gmail.non_traites():
@@ -384,7 +384,7 @@ async def boucle(once: bool):
             _afficher(r)
         if once:
             break
-        await asyncio.sleep(60)
+        await asyncio.sleep(config.RELEVE_SECONDES)
 
 
 async def demo(auto: bool):
