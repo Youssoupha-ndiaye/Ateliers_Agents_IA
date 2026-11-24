@@ -2,7 +2,7 @@
 
 Local (stdio) : python mcp_server/server.py
 HTTP          : python mcp_server/server.py --http                    (http://127.0.0.1:8000/mcp)
-Réseau local  : python mcp_server/server.py --http --host 0.0.0.0     (pour l'agent d'une autre équipe)
+Réseau local  : python mcp_server/server.py --reseau                  (partage : affiche l'URL à donner)
 Inspecteur    : npx @modelcontextprotocol/inspector python mcp_server/server.py
 
 Compatible SDK MCP Python 1.x (FastMCP) et 2.x (FastMCP renommé MCPServer).
@@ -18,6 +18,65 @@ import catalogue  # noqa: E402
 
 HOST = sys.argv[sys.argv.index("--host") + 1] if "--host" in sys.argv else "127.0.0.1"
 PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 8000
+
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# MODE RÉSEAU : partager ce serveur MCP avec d'autres machines (même Wi-Fi / même réseau local)
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+# Commande :  python mcp_server/server.py --reseau              (port 8000)
+#             python mcp_server/server.py --reseau --port 9000  (autre port)
+#
+# Comment ça marche, en 3 points :
+#
+# 1. TRANSPORT HTTP au lieu de stdio.
+#    En stdio, le serveur est un sous-processus lancé PAR l'agent, sur la MÊME machine : il parle
+#    par l'entrée et la sortie standard, donc personne d'autre ne peut le joindre. En HTTP
+#    ("streamable-http"), le serveur tourne tout seul et répond aux requêtes sur l'URL /mcp.
+#    N'importe quel client MCP qui connaît l'adresse peut s'y connecter.
+#
+# 2. ÉCOUTE SUR 0.0.0.0 au lieu de 127.0.0.1.
+#    127.0.0.1 (localhost) n'accepte que les connexions venant de CE PC. 0.0.0.0 signifie
+#    « toutes les cartes réseau ». Le serveur accepte alors aussi les connexions qui arrivent par
+#    le Wi-Fi ou l'Ethernet, c'est-à-dire celles des autres PC.
+#
+# 3. AFFICHAGE DE L'ADRESSE À PARTAGER.
+#    0.0.0.0 n'est pas une adresse qu'on peut donner à quelqu'un. La fonction ip_locale() trouve
+#    l'IP de ce PC sur le réseau local (ex. 192.168.1.23) et le serveur affiche l'URL exacte à
+#    transmettre : http://192.168.1.23:8000/mcp
+#
+# Côté de l'autre équipe : elle met cette URL dans son client MCP, par exemple
+#     MultiServerMCPClient({"catalogue": {"transport": "streamable_http",
+#                                         "url": "http://192.168.1.23:8000/mcp"}})
+#
+# À savoir :
+#  - Pare-feu Windows : au premier lancement, Windows demande d'autoriser Python. Cochez
+#    « Réseaux privés ». Sinon les autres PC ne pourront pas joindre le serveur.
+#  - Les deux machines doivent être sur le même réseau. Sur Internet, il faudrait un tunnel
+#    (ngrok, cloudflared…) devant le port 8000.
+#  - Il n'y a pas d'authentification : toute personne sur le réseau peut interroger le catalogue.
+#    Les outils sont en lecture seule (rechercher / détailler des biens), donc le risque est faible.
+#    Évitez quand même ce mode sur un Wi-Fi public.
+# ═══════════════════════════════════════════════════════════════════════════════════════════════
+RESEAU = "--reseau" in sys.argv
+if RESEAU:
+    HOST = "0.0.0.0"  # point 2 : écouter sur toutes les cartes réseau, pas seulement localhost
+
+
+def ip_locale() -> str:
+    """Point 3 : retrouve l'IP de ce PC sur le réseau local (celle à donner aux autres).
+
+    Astuce : on « connecte » une socket UDP vers une adresse externe. Avec UDP, aucun paquet
+    n'est envoyé. Le système choisit seulement la carte réseau qu'il utiliserait pour y aller,
+    et getsockname() renvoie l'IP de cette carte.
+    """
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        s.connect(("8.8.8.8", 80))
+        return s.getsockname()[0]
+    except OSError:  # pas de réseau : on retombe sur le nom de la machine
+        return socket.gethostbyname(socket.gethostname())
+    finally:
+        s.close()
 
 try:  # SDK MCP 1.x
     from mcp.server.fastmcp import FastMCP
@@ -83,4 +142,11 @@ def detail_bien(
 
 
 if __name__ == "__main__":
-    lancer("--http" in sys.argv)
+    if RESEAU:
+        # Point 1 : le mode réseau impose HTTP (le stdio ne sort pas de la machine).
+        # Les messages vont sur stderr pour ne jamais se mélanger au protocole MCP.
+        print("\n  Serveur MCP Sama Kër : MODE RÉSEAU", file=sys.stderr)
+        print(f"  Sur ce PC          : http://127.0.0.1:{PORT}/mcp", file=sys.stderr)
+        print(f"  URL à partager     : http://{ip_locale()}:{PORT}/mcp", file=sys.stderr)
+        print("  (autorisez Python dans le pare-feu Windows si on vous le demande)\n", file=sys.stderr)
+    lancer("--http" in sys.argv or RESEAU)
