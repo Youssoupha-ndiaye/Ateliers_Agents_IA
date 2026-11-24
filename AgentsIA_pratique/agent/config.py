@@ -12,7 +12,9 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
 MAX_STEPS = int(os.getenv("MAX_STEPS", "12"))
 RELEVE_SECONDES = int(os.getenv("RELEVE_SECONDES", "30"))  # intervalle de relève Gmail du pipeline
 MCP_TRANSPORT = os.getenv("MCP_TRANSPORT", "stdio")
-MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://127.0.0.1:8000/mcp")
+# MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://127.0.0.1:8000/mcp")
+MCP_HTTP_URL = os.getenv("MCP_HTTP_URL", "http://192.168.40.198:8000/mcp")
+
 GOOGLE_CLIENT_SECRET = ROOT / os.getenv("GOOGLE_CLIENT_SECRET", "secrets/client_secret.json")
 GOOGLE_TOKEN = ROOT / os.getenv("GOOGLE_TOKEN", "secrets/token.json")
 AGENCY_EMAIL = os.getenv("AGENCY_EMAIL", "")

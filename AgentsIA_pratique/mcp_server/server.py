@@ -2,7 +2,7 @@
 
 Local (stdio) : python mcp_server/server.py
 HTTP          : python mcp_server/server.py --http                    (http://127.0.0.1:8000/mcp)
-Réseau local  : python mcp_server/server.py --reseau                  (partage : affiche l'URL à donner)
+Réseau local  : python mcp_server/server.py reseau                    (partage : affiche l'URL à donner)
 Inspecteur    : npx @modelcontextprotocol/inspector python mcp_server/server.py
 
 Compatible SDK MCP Python 1.x (FastMCP) et 2.x (FastMCP renommé MCPServer).
@@ -22,8 +22,9 @@ PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
 # MODE RÉSEAU : partager ce serveur MCP avec d'autres machines (même Wi-Fi / même réseau local)
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
-# Commande :  python mcp_server/server.py --reseau              (port 8000)
-#             python mcp_server/server.py --reseau --port 9000  (autre port)
+# Commande :  python mcp_server/server.py reseau                 (port 8000)
+#             python mcp_server/server.py reseau --port 9000     (autre port)
+#             `--reseau` reste aussi accepté comme alias.
 #
 # Comment ça marche, en 3 points :
 #
@@ -56,7 +57,8 @@ PORT = int(sys.argv[sys.argv.index("--port") + 1]) if "--port" in sys.argv else 
 #    Les outils sont en lecture seule (rechercher / détailler des biens), donc le risque est faible.
 #    Évitez quand même ce mode sur un Wi-Fi public.
 # ═══════════════════════════════════════════════════════════════════════════════════════════════
-RESEAU = "--reseau" in sys.argv
+# MODIFICATION : accepte `reseau` sans tirets (ta commande) et conserve `--reseau` comme alias.
+RESEAU = any(arg.lower() in {"reseau", "--reseau"} for arg in sys.argv[1:])
 if RESEAU:
     HOST = "0.0.0.0"  # point 2 : écouter sur toutes les cartes réseau, pas seulement localhost
 
