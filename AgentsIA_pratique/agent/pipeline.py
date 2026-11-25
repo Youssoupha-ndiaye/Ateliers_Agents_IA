@@ -37,7 +37,7 @@ import regles
 import tracing
 import validation
 from agent import construire_agent, outils_catalogue_mcp, run_config
-from garde_fous import classer, est_automatique
+from garde_fous import classer
 from prompts import message_email, systeme
 
 ETAT = config.STATE_DIR / "conversations.json"
@@ -295,20 +295,12 @@ async def traiter_message(msg: dict, gmail, cal, outils_mcp, etat: dict) -> dict
         dossier["historique"].append({"date": time.strftime("%Y-%m-%d %H:%M"), "decision": decision,
                                       "validations": validation.COMPTEUR["n"] - validations_avant})
         return {"thread_id": tid, "decision": decision, "erreur": erreur, "trace": fichier,
-                "draft_id": ctx.get("dernier_brouillon"),
-                "motif": ctx.get("ignore") or ctx.get("transmis") or ctx.get("refus"),
+                "draft_id": ctx.get("dernier_brouillon"), "motif": ctx.get("transmis") or ctx.get("refus"),
                 "biens": dossier.get("biens_proposes", []),
                 "creneaux": ctx.get("creneaux_run") or dossier.get("creneaux_proposes", []),
                 "visite": ctx.get("visite"), "validations": validation.COMPTEUR["n"] - validations_avant,
                 "outils": tracing.METRIQUES.get("outils", []), "duree_s": round(time.time() - t0, 2),
                 **{k: tracing.METRIQUES.get(k, 0) for k in ("tool_calls", "tokens_in", "tokens_out")}}
-
-    # 0) Email automatique (notification, newsletter, bounce) : ni LLM, ni brouillon, ni validation
-    if motif_auto := est_automatique(msg["de"], msg.get("entetes")):
-        gmail.etiqueter(tid, "ignore")
-        ctx["ignore"] = motif_auto
-        tracing.log("ignore_automatique", motif=motif_auto, de=msg["de"])
-        return resume("ignore")
 
     # 1) Garde-fou déterministe (correction de l'exercice 6) : injection / hors périmètre -> humain, sans LLM
     verdict, motif = classer(msg["sujet"] + "\n" + msg["corps"]) if config.CORRECTION else ("ok", None)
@@ -397,7 +389,7 @@ async def boucle(once: bool):
 
 async def demo(auto: bool):
     """Répétition hors ligne du critère de l'exercice 5 (vrai modèle, vrai serveur MCP, Gmail/Agenda simulés)."""
-    if auto:
+    if auto:    
         validation.set_approbateur(lambda a, d: (True, "validé (conseiller simulé)"))
     else:
         validation.set_approbateur(validation.approbateur_cli)
