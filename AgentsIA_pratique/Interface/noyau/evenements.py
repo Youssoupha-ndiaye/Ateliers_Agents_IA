@@ -19,6 +19,7 @@ LIBELLES = {
     "attente_validation": "En attente de validation",
     "repondu": "Répondu",
     "transmis": "Transmis à un conseiller",
+    "ignore": "Ignoré (email automatique)",
 }
 
 

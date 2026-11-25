@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "agent"))
 import gmail_tools  # noqa: E402
 import validation  # noqa: E402
 from ex4_gmail import creer_brouillon_fallback, reponse_guidage  # noqa: E402
-from garde_fous import classer, encapsuler  # noqa: E402
+from garde_fous import classer, encapsuler, est_automatique  # noqa: E402
 
 
 def boite(*emails):
@@ -94,6 +94,43 @@ def test_transmission():
     g, ctx, bx = boite(("A <a@x.sn>", "Litige", "mon avocat vous contactera"))
     assert bx.transmettre_a_conseiller(ctx["thread_id"], "litige")["ok"]
     assert g.etats[ctx["thread_id"]] == "transmis"
+
+
+def test_detection_emails_automatiques():
+    # vu en production : notification Google traitée comme une demande client (trace 20261124-102902)
+    assert est_automatique("Google <noreply-accounts@google.com>")
+    assert est_automatique("Mail Delivery Subsystem <mailer-daemon@googlemail.com>")
+    assert est_automatique("GitHub <notifications@github.com>")
+    assert est_automatique("Boutique <ne-pas-repondre@boutique.sn>")
+    assert est_automatique("Lettre <contact@media.sn>", {"List-Unsubscribe": "<mailto:u@media.sn>"})
+    assert est_automatique("X <x@y.sn>", {"Auto-Submitted": "auto-replied"})
+    assert est_automatique("X <x@y.sn>", {"Precedence": "bulk"})
+    # vrais clients : jamais ignorés
+    assert est_automatique("Awa Ba <awa.ba@example.com>") is None
+    assert est_automatique("Noreen Diop <noreen@x.sn>") is None
+    assert est_automatique("Agence <info@agence.sn>", {"Auto-Submitted": "no"}) is None
+
+
+def test_aucun_envoi_vers_un_robot_meme_si_le_conseiller_valide():
+    g, ctx, bx = boite(("Google <noreply-accounts@google.com>", "Notification", "Aucune action requise"))
+    assert "DESTINATAIRE_AUTOMATIQUE" in bx.creer_brouillon(ctx["thread_id"], "Bonjour, quel type de bien cherchez-vous ?")["erreur"]
+    d = g.brouillon(ctx["thread_id"], ctx["de"], "Re: Notification", "Bonjour, quel type de bien cherchez-vous ?")
+    sollicite = []
+    validation.set_approbateur(lambda a, det: (sollicite.append(det) or True, "validé trop vite"))
+    r = bx.envoyer_brouillon(d)
+    assert not r["ok"] and "DESTINATAIRE_AUTOMATIQUE" in r["erreur"]
+    assert g.envoyes == [] and sollicite == []  # bloqué avant même de déranger le conseiller
+
+
+def test_nettoyage_du_html_avant_le_llm():
+    brut = ("Suivez les données\r\n<!--[if !mso]><!-->\r\n<!--[if mso]>\r\n<v:roundrect xmlns:v=\"urn:x\"\r\n"
+            "href=\"https://accounts.google.com/x\">\r\n<![endif]-->\r\n"
+            "<https://c.gle/AGSJxQy_E030QFgK4pWhBybVlIf4fDOKJRBXa--CF1yPOI6SGa9q1wVr29JZeUbeRouqzv6Gt7U8IC2O9U>Claude\r\n"
+            "<p>Un F3 &agrave; Mermoz &lt;400 000 F</p>\r\n\r\n\r\n\r\nmoins de <400 000 F")
+    t = gmail_tools.nettoyer_corps(brut)
+    assert "<!--" not in t and "v:roundrect" not in t and "c.gle" not in t and "<p>" not in t
+    assert "Un F3 à Mermoz <400 000 F" in t and "moins de <400 000 F" in t and "\n\n\n" not in t
+    assert len(t) < len(brut) / 2
 
 
 if __name__ == "__main__":

@@ -100,9 +100,10 @@
   const ETATS = {
     a_traiter: ["À traiter", "info"], attente_validation: ["En attente de validation", "warn"],
     repondu: ["Répondu", "ok"], transmis: ["Transmis à un conseiller", "bad"],
+    ignore: ["Ignoré (automatique)", "info"],
   };
   const DECISIONS = {
-    visite_creee: "Visite créée", transmis: "Transmis", repondu: "Réponse envoyée",
+    visite_creee: "Visite créée", transmis: "Transmis", ignore: "Ignoré (email automatique)", repondu: "Réponse envoyée",
     brouillon_en_attente: "Brouillon en attente", aucune_action: "Aucune action", erreur: "Erreur",
   };
   const badgeEtat = (f) => { const e = f && ETATS[f.etat]; return e ? `<span class="pill ${e[1]}"><i class="dot"></i>${e[0]}</span>` : ""; };
@@ -140,7 +141,7 @@
     const v2 = st("visite") || ((d.visites || []).length ? "fait" : "");
     const v1 = st("reponse") || ((d.biens_proposes || []).length || f.etat === "repondu" || v2 ? "fait" : "");
     const choix = v2 ? "fait" : nbClient >= 2 && v1 === "fait" ? "fait" : "";
-    return { etapes: ["fait", v1, choix, v2], transmis: f.etat === "transmis" };
+    return { etapes: ["fait", v1, choix, v2], transmis: f.etat === "transmis", ignore: f.etat === "ignore" };
   }
   const PAS = ["Reçu", "Réponse validée", "Choix du client", "Visite confirmée"];
   const progHtml = (et) => `<div class="prog">${et.map((s, i) => `${i ? `<span class="trait ${s === "fait" ? "fait" : ""}"></span>` : ""}<span class="pas ${s}"><i>${s === "fait" ? ico("check") : s === "refus" ? ico("x") : s === "cours" ? "…" : i + 1}</i><small>${PAS[i]}</small></span>`).join("")}</div>`;
@@ -293,7 +294,7 @@
       const p = progression(g.tid);
       return `<tr data-action="ouvrir-fil" data-tid="${esc(g.tid)}"><td style="width:46px">${avatar(g.dernier.nom)}</td>
         <td class="cl"><b>${esc(g.dernier.nom)}</b><span>${esc(g.dernier.sujet)}</span></td>
-        <td>${p.transmis ? `<span class="pill bad"><i class="dot"></i>Transmis à un conseiller</span>` : progHtml(p.etapes)}</td>
+        <td>${p.transmis ? `<span class="pill bad"><i class="dot"></i>Transmis à un conseiller</span>` : p.ignore ? `<span class="pill info"><i class="dot"></i>Ignoré (email automatique)</span>` : progHtml(p.etapes)}</td>
         <td style="text-align:right">${badgeAgent(g.tid)}</td></tr>`;
     }).join("")}</tbody></table></div>`;
   }
@@ -313,7 +314,7 @@
   }
 
   // ------------------------------------------------------------------ boîte de réception
-  const FILTRES = [["tous", "Tous"], ["a_traiter", "À traiter"], ["attente_validation", "En attente"], ["repondu", "Répondus"], ["transmis", "Transmis"]];
+  const FILTRES = [["tous", "Tous"], ["a_traiter", "À traiter"], ["attente_validation", "En attente"], ["repondu", "Répondus"], ["transmis", "Transmis"], ["ignore", "Ignorés"]];
   const filtreOk = (g, f) => f === "tous" || (S.fils[g.tid]?.etat || "a_traiter") === f;
   PAGES.boite = {
     titre: "Boîte de réception",
@@ -368,7 +369,7 @@
 
       const p = progression(g.tid), d = S.dossiers[g.tid] || {};
       patch("b-side", `<div><p class="sec-titre">Suivi de l'agent</p>${timeline((f.etapes || []).slice(-12), f.agent === "en_cours")}</div>
-        <div><p class="sec-titre">Progression</p>${p.transmis ? `<span class="pill bad"><i class="dot"></i>Transmis à un conseiller</span>` : progHtml(p.etapes)}</div>
+        <div><p class="sec-titre">Progression</p>${p.transmis ? `<span class="pill bad"><i class="dot"></i>Transmis à un conseiller</span>` : p.ignore ? `<span class="pill info"><i class="dot"></i>Ignoré (email automatique)</span>` : progHtml(p.etapes)}</div>
         <div><p class="sec-titre">Dossier du client</p>${dossierHtml(d)}</div>`);
 
       if (S.systeme.mode === "demo") {

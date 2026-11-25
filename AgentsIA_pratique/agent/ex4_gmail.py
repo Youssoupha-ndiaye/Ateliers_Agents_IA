@@ -27,7 +27,7 @@ import gmail_tools
 import tracing
 import validation
 from agent import construire_agent, outils_catalogue_mcp, run_config
-from garde_fous import classer
+from garde_fous import classer, est_automatique
 from prompts import message_email, systeme
 
 FAKE = "--fake" in sys.argv
@@ -111,6 +111,11 @@ async def traiter_email(msg: dict, gmail, cal, outils_mcp) -> dict:
     tracing.log("email_recu", thread_id=tid, de=msg["de"], sujet=msg["sujet"], corps=msg["corps"])
     gmail.etiqueter(tid, "a_traiter")
     ctx = {"thread_id": tid, "de": msg["de"], "sujet": msg["sujet"], "rfc_message_id": msg.get("rfc_message_id", "")}
+
+    if motif := est_automatique(msg["de"], msg.get("entetes")):  # notification, newsletter, bounce
+        gmail.etiqueter(tid, "ignore")
+        tracing.log("ignore_automatique", motif=motif, de=msg["de"])
+        return {"thread_id": tid, "de": msg["de"], "decision": "ignore", "motif": motif, "trace": trace}
 
     verdict, motif = classer(msg["sujet"] + "\n" + msg["corps"])
     if verdict != "ok":  # injection ou hors périmètre : un humain reprend, le LLM ne voit pas l'email

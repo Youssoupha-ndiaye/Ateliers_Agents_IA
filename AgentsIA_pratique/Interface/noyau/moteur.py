@@ -21,6 +21,7 @@ import config
 DECISIONS = {
     "visite_creee": "Visite créée et confirmée",
     "transmis": "Transmis à un conseiller",
+    "ignore": "Ignoré (email automatique)",
     "repondu": "Réponse envoyée",
     "brouillon_en_attente": "Brouillon en attente",
     "aucune_action": "Aucune action",
@@ -216,6 +217,8 @@ class Moteur:
         tid, e = self.etat.fil_courant, self.etat
         if evt == "email_recu":
             e.etape(tid, "Lecture de l'email et de l'historique du fil", "lecture")
+        elif evt == "ignore_automatique":
+            e.etape(tid, f"Email automatique : {d.get('motif')} → ignoré, sans appeler l'IA ni répondre", "alerte")
         elif evt == "transmis_conseiller":
             e.etape(tid, f"Garde-fou : {d.get('motif')} → transmis à un conseiller, sans appeler l'IA", "alerte")
         elif evt == "tool_start":

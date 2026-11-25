@@ -3,21 +3,25 @@
 Trois actions demandées par l'atelier + une action de transmission :
     lire_demandes_non_traitees · creer_brouillon (dans le bon fil) · envoyer_brouillon (après validation)
     transmettre_a_conseiller (hors périmètre, injection)
-Libellés d'état posés sur le fil : À traiter -> En attente de validation -> Répondu, ou Transmis à un conseiller.
+Libellés d'état posés sur le fil : À traiter -> En attente de validation -> Répondu, ou Transmis à un conseiller,
+ou Ignoré (email automatique : notification, newsletter, bounce).
 
 Sécurité :
   - l'envoi passe TOUJOURS par validation.demander() (dans le code, pas dans le prompt) ;
   - l'agent ne peut écrire / envoyer que dans le fil qu'il traite (thread_id imposé par le pipeline) ;
-  - aucun outil ne permet de lister les clients ou de lire d'autres fils.
+  - aucun outil ne permet de lister les clients ou de lire d'autres fils ;
+  - aucun brouillon ni envoi vers une adresse automatique (noreply...), même si le conseiller valide.
 La logique (classe BoiteAgence) est testable sans LangChain (tests/test_ex4_gmail.py).
 """
 import base64
+import html
 import itertools
 import re
 from email.mime.text import MIMEText
 
 from pydantic import BaseModel, Field
 
+from garde_fous import adresse_email, est_automatique
 from validation import demander
 
 LIBELLES = {  # état -> nom du libellé Gmail
@@ -25,16 +29,38 @@ LIBELLES = {  # état -> nom du libellé Gmail
     "attente_validation": "SamaKer/En attente de validation",
     "repondu": "SamaKer/Répondu",
     "transmis": "SamaKer/Transmis à un conseiller",
+    "ignore": "SamaKer/Ignoré (email automatique)",
 }
+# En-têtes conservés pour détecter les emails automatiques (garde_fous.est_automatique)
+ENTETES_AUTO = ("auto-submitted", "precedence", "list-unsubscribe", "list-id", "x-autoreply",
+                "x-autorespond", "return-path")
+
+
+def nettoyer_corps(texte: str) -> str:
+    """Retire le bruit HTML (commentaires conditionnels Outlook, balises, liens de suivi) avant le LLM :
+    sur une notification Google, 4 000 tokens de balises tombent à quelques centaines."""
+    t = re.sub(r"<!--.*?-->|<!\[endif\]-->|<!--\[if[^\]]*\]>", " ", texte or "", flags=re.DOTALL)
+    t = re.sub(r"<(style|script)\b.*?</\1>", " ", t, flags=re.DOTALL | re.IGNORECASE)
+    t = re.sub(r"<br\s*/?>|</p>|</div>|</tr>", "\n", t, flags=re.IGNORECASE)
+    t = re.sub(r"</?[a-zA-Z][^<>]{0,2000}>", " ", t)  # balises HTML et liens <https://...> (« <400 000 F » reste)
+    t = re.sub(r"https?://\S{60,}", "[lien]", html.unescape(t))  # liens de suivi interminables
+    lignes = [" ".join(l.split()) for l in t.replace("\r", "").split("\n")]
+    t = "\n".join(lignes)
+    return re.sub(r"\n{3,}", "\n\n", t).strip()
+
+
+def _brut(payload, mime) -> str:
+    if payload.get("mimeType") == mime and payload.get("body", {}).get("data"):
+        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", "replace")
+    for p in payload.get("parts", []) or []:
+        if t := _brut(p, mime):
+            return t
+    return ""
 
 
 def _texte(payload) -> str:
-    if payload.get("mimeType") == "text/plain" and payload.get("body", {}).get("data"):
-        return base64.urlsafe_b64decode(payload["body"]["data"]).decode("utf-8", "replace")
-    for p in payload.get("parts", []) or []:
-        if t := _texte(p):
-            return t
-    return ""
+    """Texte lisible d'un message : partie text/plain, sinon text/html, toujours nettoyé."""
+    return nettoyer_corps(_brut(payload, "text/plain") or _brut(payload, "text/html"))
 
 
 # =====================================================================
@@ -56,7 +82,7 @@ class GmailBackend:
     def non_traites(self, max_n=10):
         """Renvoie le dernier message entrant non final de chaque fil, du plus ancien au plus récent."""
         msgs = self.svc.messages().list(userId="me", q="in:inbox -from:me", maxResults=max_n).execute().get("messages", [])
-        finaux = {self.ids["attente_validation"], self.ids["repondu"], self.ids["transmis"]}
+        finaux = {self.ids[k] for k in ("attente_validation", "repondu", "transmis", "ignore") if k in self.ids}
         derniers = {}
         for m in msgs:  # Gmail renvoie les messages du plus récent au plus ancien.
             meta = self.svc.messages().get(userId="me", id=m["id"], format="minimal").execute()
@@ -73,6 +99,7 @@ class GmailBackend:
         h = {x["name"].lower(): x["value"] for x in m["payload"]["headers"]}
         return {"message_id": mid, "thread_id": m["threadId"], "de": h.get("from", ""),
                 "sujet": h.get("subject", ""), "rfc_message_id": h.get("message-id", ""),
+                "entetes": {k: h[k] for k in ENTETES_AUTO if k in h},
                 "corps": _texte(m["payload"])[:4000]}
 
     def fil(self, thread_id):
@@ -112,13 +139,14 @@ class FakeGmailBackend:
         self._n = itertools.count(1)
         self.threads, self.drafts, self.envoyes, self.etats = {}, {}, [], {}
         for e in emails:
-            self.recevoir(e["de"], e["sujet"], e["corps"], e.get("thread_id"))
+            self.recevoir(e["de"], e["sujet"], e["corps"], e.get("thread_id"), e.get("entetes"))
 
-    def recevoir(self, de, sujet, corps, thread_id=None):
+    def recevoir(self, de, sujet, corps, thread_id=None, entetes=None):
         tid = thread_id or f"t{next(self._n)}"
         mid = f"m{next(self._n)}"
         self.threads.setdefault(tid, []).append({"message_id": mid, "thread_id": tid, "de": de, "sujet": sujet,
-                                                 "rfc_message_id": f"<{mid}@fake>", "corps": corps, "client": True})
+                                                 "rfc_message_id": f"<{mid}@fake>", "corps": corps, "client": True,
+                                                 "entetes": dict(entetes or {})})
         self.etats[tid] = "nouveau"
         return tid
 
@@ -173,6 +201,9 @@ class BoiteAgence:
             thread_id = self.ctx.get("thread_id") or thread_id  # le fil est imposé par le pipeline
             if self.ctx.get("cloture"):
                 return {"ok": False, "erreur": "CONVERSATION_CLOSE : la confirmation a déjà été envoyée. N'écris rien d'autre."}
+            if motif := est_automatique(self.ctx.get("de", "")):
+                return {"ok": False, "erreur": f"DESTINATAIRE_AUTOMATIQUE : {motif}. Personne ne lira la réponse ; "
+                                               "n'écris rien."}
             corps = re.sub(r"\bJerais\s+vous\s+inviter\b", "Je vous invite", corps, flags=re.IGNORECASE)
             if len(corps.strip()) < 20:
                 return {"ok": False, "erreur": "Corps trop court : rédige la réponse complète au client."}
@@ -190,6 +221,11 @@ class BoiteAgence:
             self._fil_autorise(d["thread_id"])
             details = {"a": d.get("a") or self.ctx.get("de"), "sujet": d.get("sujet"),
                        "draft_id": draft_id, "corps": d["corps"]}
+            # Bloqué dans le CODE, avant même de solliciter le conseiller : un clic trop rapide
+            # ne peut plus faire partir une réponse vers un robot (noreply, mailer-daemon...).
+            if motif := est_automatique(details["a"] or ""):
+                return {"ok": False, "erreur": f"DESTINATAIRE_AUTOMATIQUE : envoi à {adresse_email(details['a'])} "
+                                               f"bloqué ({motif}). Rien n'a été envoyé."}
             if self.ctx.get("message_recu"):
                 details["message_recu"] = self.ctx["message_recu"]
             ok, motif = demander("Envoyer l'email", details)

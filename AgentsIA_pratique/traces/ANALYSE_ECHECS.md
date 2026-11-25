@@ -11,6 +11,23 @@ Remplacez les blocs ci-dessous par VOS trois échecs réels (id de l'email + ext
 Les trois cas pré-remplis sont ceux que l'on observe typiquement avec un modèle 7B ;
 vérifiez-les dans vos traces avant la restitution.
 
+## Échec réel — notification Google traitée comme une demande client → CORRIGÉ
+- **Trace** : `traces/20261124-102902_thread-1a20863fd411955e.jsonl`.
+- **Symptôme** : l'avis automatique « Vous avez partagé certaines données de votre compte Google avec Claude »
+  (expéditeur `noreply-accounts@google.com`) passe les garde-fous. Le LLM lit **4 132 tokens** (surtout du HTML :
+  commentaires `<!--[if mso]>`, liens de suivi), répond en **144,7 s** sans appeler d'outil, le fallback crée le
+  brouillon, et le conseiller valide en 23 s. La réponse part vers une adresse `noreply`.
+- **Causes** : (1) aucun filtre sur les emails automatiques ; (2) le corps brut est donné au modèle sans nettoyage ;
+  (3) la validation humaine est la seule barrière, et elle a été accordée sans lecture attentive.
+- **Corrections** (testées dans `tests/test_ex4_gmail.py`) :
+  1. `garde_fous.est_automatique()` repère l'expéditeur (`noreply`, `mailer-daemon`, `notifications@`…) et les en-têtes
+     standard (`Auto-Submitted`, `List-Unsubscribe`, `Precedence: bulk`, `Return-Path: <>`). Le fil reçoit le libellé
+     **« Ignoré (email automatique) »**, sans LLM, sans brouillon et sans validation.
+  2. `gmail_tools.nettoyer_corps()` retire les commentaires, balises et liens de suivi avant le LLM
+     (sur cette notification : 4 000 → 1 558 caractères).
+  3. `creer_brouillon` et `envoyer_brouillon` **refusent dans le code** toute réponse à une adresse automatique,
+     avant même de solliciter le conseiller. Un clic trop rapide ne peut plus rien envoyer à un robot.
+
 ## Échec 1 — E13/E14 : injection traitée comme une demande normale (version « avant ») → CORRIGÉ
 - **Symptôme** : sur E14, le modèle appelle `rechercher_biens(type_bien="F2", quartier="Mermoz")`
   puis `creer_brouillon`, en reprenant parfois la « note interne » (ex. « nous vous mettons en copie… »).
