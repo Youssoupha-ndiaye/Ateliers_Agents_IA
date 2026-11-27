@@ -39,6 +39,58 @@ def test_horaires():
     assert not regles.est_dans_horaires(h(date(2026, 11, 22), 10))  # dimanche
 
 
+def test_premiere_heure_disponible():
+    j = date(2026, 11, 19)
+    occupations = {
+        "Awa": [(h(j, 9), h(j, 10))],
+        "Moussa": [],
+        "Fatou": [],
+    }
+    creneaux = regles.creneaux_libres(j, "journee", occupations, nombre=1, maintenant=h(j, 8))
+    assert len(creneaux) == 1
+    assert datetime.fromisoformat(creneaux[0]["debut"]) == h(j, 9)
+    assert creneaux[0]["conseiller"] in ("Moussa", "Fatou")
+
+
+def test_charge_journaliere_departage_a_heure_egale():
+    j = date(2026, 11, 19)
+    occupations = {
+        "Awa": [(h(j, 12), h(j, 12, 45)), (h(j, 14), h(j, 14, 45))],
+        "Moussa": [(h(j, 13), h(j, 13, 45))],
+        "Fatou": [],
+    }
+    creneaux = regles.creneaux_libres(j, "journee", occupations, nombre=1, maintenant=h(j, 8))
+    assert datetime.fromisoformat(creneaux[0]["debut"]) == h(j, 9)
+    assert creneaux[0]["conseiller"] == "Fatou"
+
+
+def test_visite_inscrite_dans_agenda_du_conseiller_reparti():
+    j = date(2026, 11, 19)
+    occupations = {
+        "Awa": [(h(j, 12), h(j, 12, 45)), (h(j, 14), h(j, 14, 45))],
+        "Moussa": [(h(j, 13), h(j, 13, 45))],
+        "Fatou": [],
+    }
+    backend = calendar_tools.FakeCalendarBackend(occupe=occupations)
+    proposition = regles.creneaux_libres(j, "journee", occupations, nombre=1, maintenant=h(j, 8))[0]
+    resultat = calendar_tools.Agenda(backend).creer_visite(
+        proposition["conseiller"], proposition["debut"], "SK-001", "adresse", "Client", "client@example.com"
+    )
+    assert resultat["ok"] and resultat["conseiller"] == "Fatou", resultat
+    assert len(backend.events["Fatou"]) == 1
+    assert len(backend.events["Awa"]) == 2 and len(backend.events["Moussa"]) == 1
+
+
+def test_propositions_equilibrees_entre_conseillers():
+    j = date(2026, 11, 19)
+    occupations = {"Awa": [], "Moussa": [], "Fatou": []}
+    creneaux = regles.creneaux_libres(j, "journee", occupations, nombre=3, maintenant=h(j, 8))
+    assert [datetime.fromisoformat(c["debut"]) for c in creneaux] == [
+        h(j, 9), h(j, 9, 30), h(j, 10)
+    ]
+    assert {c["conseiller"] for c in creneaux} == {"Awa", "Moussa", "Fatou"}
+
+
 def test_trois_creneaux_libres():
     j = regles.resoudre_date("jeudi prochain")
     b = calendar_tools.FakeCalendarBackend(occupe={"Awa": [(h(j, 16), h(j, 18))], "Moussa": [(h(j, 16), h(j, 17))]})

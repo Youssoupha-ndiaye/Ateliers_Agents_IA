@@ -2,3 +2,20 @@
 .venv/
 venv/
 env/
+*.db
+
+# Cache Python
+__pycache__/
+*.pyc
+
+secrets/
+token.json
+*.json.token
+client_secret*.json
+credentials*.json
+
+# Fichiers de configuration locale
+.env
+
+# Traces d'exécution locales (conserver le dossier avec .gitkeep)
+/AgentsIA_pratique/traces/*.jsonl

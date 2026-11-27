@@ -75,8 +75,10 @@ def chevauche(a0, a1, b0, b1) -> bool:
 
 def creneaux_libres(jour: date, moment: str, occupations: dict[str, list[tuple[datetime, datetime]]],
                     nombre: int = 3, maintenant: datetime | None = None) -> list[dict]:
-    """occupations = {conseiller: [(debut, fin), ...]}. Renvoie au plus `nombre` créneaux
-    réellement libres, répartis entre conseillers, triés par heure."""
+    """Renvoie les créneaux libres les plus tôt, en équilibrant la charge du jour.
+
+    occupations = {conseiller: [(debut, fin), ...]}.
+    """
     if jour.weekday() == 6:
         return []
     h0, h1 = plage_moment(moment)
@@ -84,14 +86,35 @@ def creneaux_libres(jour: date, moment: str, occupations: dict[str, list[tuple[d
     t = datetime.combine(jour, max(h0, OUVERTURE), TZ)
     fin_plage = datetime.combine(jour, min(h1, FERMETURE), TZ)
     res: list[dict] = []
+    # La liste d'occupations couvre la journée : elle sert de mesure simple de la charge.
+    # Les créneaux proposés dans cet appel sont ajoutés aussi, pour ne pas proposer les 3
+    # options au même conseiller quand plusieurs conseillers sont également disponibles.
+    charge = {c: len(occ) for c, occ in occupations.items()}
+    derniere_visite = {
+        c: max((debut for debut, _ in occ), default=None)
+        for c, occ in occupations.items()
+    }
+    ordre = {c: i for i, c in enumerate(occupations)}
     while t + DUREE <= fin_plage and len(res) < nombre:
         espace = all(abs((t - datetime.fromisoformat(r["debut"])).total_seconds()) >= 1800 for r in res)
         if t > now and espace:
+            disponibles = []
             for c, occ in occupations.items():
                 deja = [(datetime.fromisoformat(r["debut"]), datetime.fromisoformat(r["fin"]))
                         for r in res if r["conseiller"] == c]
                 if not any(chevauche(t, t + DUREE, o0, o1) for o0, o1 in occ + deja):
-                    res.append({"conseiller": c, "debut": t.isoformat(), "fin": (t + DUREE).isoformat()})
-                    break
+                    disponibles.append(c)
+            if disponibles:
+                # L'heure la plus tôt reste prioritaire. À heure égale, choisir le moins
+                # chargé; en cas d'égalité, privilégier la visite la plus ancienne, puis
+                # l'ordre configuré pour que le résultat reste déterministe.
+                c = min(disponibles, key=lambda nom: (
+                    charge[nom],
+                    derniere_visite[nom] or datetime.min.replace(tzinfo=TZ),
+                    ordre[nom],
+                ))
+                res.append({"conseiller": c, "debut": t.isoformat(), "fin": (t + DUREE).isoformat()})
+                charge[c] += 1
+                derniere_visite[c] = t
         t += PAS
     return res

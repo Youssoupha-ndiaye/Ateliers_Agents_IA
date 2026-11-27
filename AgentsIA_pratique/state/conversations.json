@@ -324,11 +324,30 @@
         "date": "2026-11-25 08:27",
         "decision": "repondu",
         "validations": 1
+      },
+      {
+        "date": "2026-11-25 08:51",
+        "decision": "repondu",
+        "validations": 1
       }
     ],
-    "biens_proposes": [
-      "SK-007",
-      "SK-012"
+    "biens_proposes": [],
+    "creneaux_proposes": [
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T14:00:00+00:00",
+        "fin": "2026-11-26T14:45:00+00:00"
+      },
+      {
+        "conseiller": "Moussa",
+        "debut": "2026-11-26T14:30:00+00:00",
+        "fin": "2026-11-26T15:15:00+00:00"
+      },
+      {
+        "conseiller": "Awa",
+        "debut": "2026-11-26T15:00:00+00:00",
+        "fin": "2026-11-26T15:45:00+00:00"
+      }
     ]
   }
 }
